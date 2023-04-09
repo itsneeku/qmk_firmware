@@ -38,12 +38,7 @@ struct spam_flag {
 
 struct spam_flag spam_modes[] = {
     // MOUSE_JIGGLE
-    //KEYS,         ENABLED, TIMER, DELAY, RGB_MATRIX_INDEX
-    {
-      {KC_MS_LEFT,
-    KC_MS_RIGHT,
-    KC_MS_WH_UP,
-    KC_MS_WH_DOWN}, false, 0, 60000, 2},
+    {{KC_MS_LEFT, KC_MS_RIGHT, KC_MS_WH_UP, KC_MS_WH_DOWN}, false, 0, 60000, 2},
 
     // SPAM_SCROLL_UP
     {{KC_MS_WH_UP}, false, 0, 1000, 1},
@@ -98,4 +93,6 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         } else {
             RGB_MATRIX_INDICATOR_SET_COLOR(spam_modes[i].rgb_matrix_index, 0, 0, 0);
         }
-   
+    }
+    return true;
+}
