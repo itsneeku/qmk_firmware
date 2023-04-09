@@ -12,60 +12,90 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #include QMK_KEYBOARD_H
 #include <time.h>
 
 enum custom_keycodes {
   MOUSE_JIGGLE = SAFE_RANGE,
-  BHOP
+  BHOP,
+  SPAM_SCROLL_UP,
+  SPAM_SCROLL_DOWN
 };
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
-  [0] = LAYOUT(MOUSE_JIGGLE, KC_F13, KC_F14,
-               KC_MEDIA_PREV_TRACK, KC_MEDIA_PLAY_PAUSE, KC_MEDIA_NEXT_TRACK,
-               KC_F15, KC_F16, KC_F17),
+  [0] = LAYOUT(MOUSE_JIGGLE,        SPAM_SCROLL_UP,               SPAM_SCROLL_DOWN,
+               KC_MEDIA_PREV_TRACK, KC_MEDIA_PLAY_PAUSE,  KC_MEDIA_NEXT_TRACK,
+               KC_F13,              KC_F14,               KC_F15),
 };
 
-bool mouse_jiggle_mode = false;
-uint32_t mouse_jiggle_timer = 0;
+struct spam_flag {
+    uint16_t key_codes[4];
+    bool     enabled;
+    uint32_t timer;
+    int      delay;
+    int      rgb_matrix_index;
+};
+
+struct spam_flag spam_modes[] = {
+    // MOUSE_JIGGLE
+    //KEYS,         ENABLED, TIMER, DELAY, RGB_MATRIX_INDEX
+    {
+      {KC_MS_LEFT,
+    KC_MS_RIGHT,
+    KC_MS_WH_UP,
+    KC_MS_WH_DOWN}, false, 0, 60000, 2},
+
+    // SPAM_SCROLL_UP
+    {{KC_MS_WH_UP}, false, 0, 1000, 1},
+
+    // SPAM_SCROLL_DOWN
+    {{KC_MS_WH_DOWN}, false, 0, 1000, 0}};
+
+void handle_spam(void) {
+    for (int i = 0; i < sizeof(spam_modes) / sizeof(spam_modes[0]); i++) {
+        if (spam_modes[i].enabled && timer_elapsed32(spam_modes[i].timer) > spam_modes[i].delay) {
+            for (int j = 0; j < sizeof(spam_modes[i].key_codes) / sizeof(spam_modes[i].key_codes[0]); j++) {
+                if (spam_modes[i].key_codes[j]) {
+                    tap_code(spam_modes[i].key_codes[j]);
+                    spam_modes[i].timer = timer_read32();
+                }
+            }
+        }
+    }
+}
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-  // Stop mouse jiggle whenever ANY key is pressed
-  if (record->event.pressed && keycode != MOUSE_JIGGLE) {
-    mouse_jiggle_mode = false;
-  }
-  switch (keycode) {
-    case MOUSE_JIGGLE:
-      if (record->event.pressed) {
-        mouse_jiggle_mode = !mouse_jiggle_mode;
-        mouse_jiggle_timer = timer_read();
-        break;
-      }
-    default:
-      break;
-  }
-  return true; // Process all other keycodes normally
+    switch (keycode) {
+        case MOUSE_JIGGLE:
+            if (record->event.pressed) {
+                spam_modes[0].enabled = !spam_modes[0].enabled;
+                break;
+            }
+        case SPAM_SCROLL_UP:
+            if (record->event.pressed) {
+                spam_modes[1].enabled = !spam_modes[1].enabled;
+                break;
+            }
+        case SPAM_SCROLL_DOWN:
+            if (record->event.pressed) {
+                spam_modes[2].enabled = !spam_modes[2].enabled;
+                break;
+            }
+        default:
+            break;
+    }
+    return true; // Process all other keycodes normally
 }
 
 void matrix_scan_user(void) {
-  if (mouse_jiggle_mode) {
-    if (timer_elapsed32(mouse_jiggle_timer) > 60000 ) { 
-      //60000ms = 1 minute
-      tap_code(KC_MS_LEFT);
-      tap_code(KC_MS_RIGHT);
-      tap_code(KC_MS_WH_UP);
-      tap_code(KC_MS_WH_DOWN);
-      mouse_jiggle_timer = timer_read32();
-    }
-  }
+    handle_spam();
 }
 
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
-  if (mouse_jiggle_mode) {
-    RGB_MATRIX_INDICATOR_SET_COLOR(2, 250, 168, 178);
-  } else {
-    RGB_MATRIX_INDICATOR_SET_COLOR(2, 0, 0, 0);
-  }
-  return true;
-}
+    for (int i = 0; i < sizeof(spam_modes) / sizeof(spam_modes[0]); i++) {
+        if (spam_modes[i].enabled) {
+            RGB_MATRIX_INDICATOR_SET_COLOR(spam_modes[i].rgb_matrix_index, 250, 168, 178);
+        } else {
+            RGB_MATRIX_INDICATOR_SET_COLOR(spam_modes[i].rgb_matrix_index, 0, 0, 0);
+        }
+   
